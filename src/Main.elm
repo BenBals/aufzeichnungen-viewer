@@ -1,11 +1,11 @@
 module Main exposing (..)
 
 import ListContents
-import Html
+import Html.App as App
 
 
 main =
-    Html.program
+    App.program
         { init = ListContents.init
         , view = ListContents.view
         , update = ListContents.update
