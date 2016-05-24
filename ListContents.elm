@@ -5,7 +5,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Task
-import Json.Decode as Json exposing ((:=))
+import Json.Decode as Json exposing ((:=), andThen)
 import String
 
 
@@ -24,13 +24,14 @@ type alias Element =
     { name : String
     , path : String
     , kind : ElementKind
-    , downloadLink : Maybe String
+    , viewLink : Maybe String
     }
 
 
 type ElementKind
     = File
     | Directory
+    | Other
 
 
 init : ( Model, Cmd Msg )
@@ -56,7 +57,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ReceivedContents data ->
-            ( { model | contents = data }, Cmd.none )
+            ( { model | contents = data, error = Nothing }, Cmd.none )
 
         RequestContents ->
             ( { model | path = model.input }, getContents model.input )
@@ -84,6 +85,10 @@ view model =
             , button [ onClick RequestContents ] [ text "Laden" ]
             ]
         , div [] (List.map displayContent model.contents)
+        , br [] []
+        , div [] [
+                 button [ onClick (Switch ("/")) ] [ text "Home" ]
+                ]
         , div [] [ text (Maybe.withDefault "" model.error) ]
         ]
 
@@ -91,7 +96,9 @@ view model =
 displayContent : Element -> Html Msg
 displayContent element =
     div []
-        [ button [ onClick (Switch ("/" ++ element.path)) ] [ text content.name ]
+        [ if element.kind == Directory
+          then button [ onClick (Switch ("/" ++ element.path)) ] [ text element.name ]
+          else a [ href (Maybe.withDefault "" element.viewLink) ] [ text element.name ]
         ]
 
 
@@ -114,20 +121,34 @@ getContents path =
         url =
             "https://api.github.com/repositories/55137831/contents/" ++ (String.dropLeft 1 path)
     in
-        Task.perform FailedContents ReceivedContents (Http.get decodeContentNames url)
+        Task.perform FailedContents ReceivedContents (Http.get decodeContentToElements url)
 
 
 decodeContentToElement : Json.Decoder Element
 decodeContentToElement =
-  let
-    customKindDecoder = 
-  in
-    Json.object4
-        Element
-        ("name" := Json.sting)
-        ("path" := Json.sting)
-        ("kind" := customKindDecoder)
-        ("download_url" := Json.Maybe Json.string)
+    let
+        stringToKind kind =
+            case kind of
+                "file" ->
+                    File
+
+                "dir" ->
+                    Directory
+
+                _ ->
+                    Other
+
+        decodeKind kind =
+            Json.succeed (stringToKind kind)
+
+        customKindDecoder =
+            ("type" := Json.string) `andThen` decodeKind
+    in
+        Json.object4 Element
+            ("name" := Json.string)
+            ("path" := Json.string)
+            customKindDecoder
+            ("html_url" := Json.maybe Json.string)
 
 
 decodeContentToElements : Json.Decoder (List Element)
