@@ -118,9 +118,18 @@ getContents path =
 
 
 decodeContentToElement : Json.Decoder Element
-decodeContentToElement = 
+decodeContentToElement =
+  let
+    customKindDecoder = 
+  in
+    Json.object4
+        Element
+        ("name" := Json.sting)
+        ("path" := Json.sting)
+        ("kind" := customKindDecoder)
+        ("download_url" := Json.Maybe Json.string)
 
 
-decodeContentNames : Json.Decoder (List Element)
-decodeContentNames =
+decodeContentToElements : Json.Decoder (List Element)
+decodeContentToElements =
     Json.list decodeContentToElement
